@@ -1,0 +1,14 @@
+{
+  "name": "cordova-webview-template",
+  "version": "1.0.0",
+  "description": "Reusable Cordova WebView APK builder template",
+  "main": "build.js",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": ["cordova", "webview", "android", "apk"],
+  "license": "MIT"
+}
