@@ -49,7 +49,10 @@ jobs:
             icon:        './res/icon.png'
           };
           fs.writeFileSync('config.json', JSON.stringify(config, null, 2));
-          console.log('config.json generated:', config);
+          console.log('config.json generated successfully');
+          console.log('appName:', config.appName);
+          console.log('packageId:', config.packageId);
+          console.log('targetUrl:', config.targetUrl);
           "
         env:
           APP_NAME:     ${{ secrets.APP_NAME }}
@@ -57,6 +60,9 @@ jobs:
           TARGET_URL:   ${{ secrets.TARGET_URL }}
           VERSION_NAME: ${{ secrets.VERSION_NAME }}
           VERSION_CODE: ${{ secrets.VERSION_CODE }}
+
+      - name: Verify config.json
+        run: cat config.json
 
       - name: Build APK
         run: node build.js
