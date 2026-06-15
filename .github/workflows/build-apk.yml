@@ -1,34 +1,20 @@
-name: Build Android APK
+name: Build iOS IPA
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-apk:
-    runs-on: ubuntu-latest
+  build-ipa:
+    runs-on: macos-latest
 
     steps:
-
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK components
-        run: |
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          node-version: "18"
 
       - name: Install Cordova
         run: npm install -g cordova@13
@@ -50,29 +36,87 @@ jobs:
             orientation: process.env.ORIENTATION || 'default'
           };
           fs.writeFileSync('config.json', JSON.stringify(config, null, 2));
-          console.log('config.json generated successfully');
-          console.log('appName:', config.appName);
-          console.log('packageId:', config.packageId);
-          console.log('targetUrl:', config.targetUrl);
-          console.log('orientation:', config.orientation);
+          console.log('config.json generated:', config);
           "
         env:
-          APP_NAME:     ${{ secrets.APP_NAME }}
-          PACKAGE_ID:   ${{ secrets.PACKAGE_ID }}
-          TARGET_URL:   ${{ secrets.TARGET_URL }}
+          APP_NAME: ${{ secrets.APP_NAME }}
+          PACKAGE_ID: ${{ secrets.PACKAGE_ID }}
+          TARGET_URL: ${{ secrets.TARGET_URL }}
           VERSION_NAME: ${{ secrets.VERSION_NAME }}
           VERSION_CODE: ${{ secrets.VERSION_CODE }}
-          ORIENTATION:  ${{ secrets.ORIENTATION }}
+          ORIENTATION: ${{ secrets.ORIENTATION }}
 
-      - name: Verify config.json
-        run: cat config.json
+      - name: Create Cordova project structure
+        run: |
+          mkdir -p projects
+          cordova create "projects/${PACKAGE_ID}" "${PACKAGE_ID}" "${APP_NAME}"
+          cd "projects/${PACKAGE_ID}"
+          cordova platform add ios
+          sed -i '' "s|version=\"1.0.0\"|version=\"${VERSION_NAME}\"|g" config.xml
+          sed -i '' "s|<content src=\"index.html\" />|<content src=\"${TARGET_URL}\" />|g" config.xml
+          sed -i '' "s|</widget>|    <access origin=\"*\" />\n    <allow-navigation href=\"*\" />\n    <allow-intent href=\"http://*/*\" />\n    <allow-intent href=\"https://*/*\" />\n</widget>|g" config.xml
+          # Lock screen orientation (global preference; applies to iOS).
+          # ORIENTATION defaults to "default" => no preference written => platform default.
+          ORIENT="${ORIENTATION:-default}"
+          if [ "$ORIENT" != "default" ]; then
+            sed -i '' "s|</widget>|    <preference name=\"Orientation\" value=\"${ORIENT}\" />\n</widget>|g" config.xml
+          fi
+          if [ -f "../../res/icon.png" ]; then
+            mkdir -p res
+            cp ../../res/icon.png res/icon.png
+          fi
+          cat > www/index.html << HTMLEOF
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+            <title>${APP_NAME}</title>
+          </head>
+          <body>
+            <script src="cordova.js"></script>
+            <script>
+              document.addEventListener('deviceready', function () {
+                document.addEventListener('backbutton', function (e) {
+                  e.preventDefault();
+                  if (history.length > 1) { history.back(); }
+                }, false);
+              }, false);
+              window.location.replace("${TARGET_URL}");
+            </script>
+          </body>
+          </html>
+          HTMLEOF
+        env:
+          APP_NAME: ${{ secrets.APP_NAME }}
+          PACKAGE_ID: ${{ secrets.PACKAGE_ID }}
+          TARGET_URL: ${{ secrets.TARGET_URL }}
+          VERSION_NAME: ${{ secrets.VERSION_NAME }}
+          ORIENTATION: ${{ secrets.ORIENTATION }}
 
-      - name: Build APK
-        run: node build.js
+      - name: Build iOS (unsigned)
+        run: |
+          cd "projects/${PACKAGE_ID}"
+          cordova build ios --emulator
+        env:
+          PACKAGE_ID: ${{ secrets.PACKAGE_ID }}
 
-      - name: Upload APK Artifact
+      - name: Package IPA
+        run: |
+          APP_PATH=$(find "projects/${PACKAGE_ID}" -name "*.app" | head -1)
+          mkdir -p dist/Payload
+          cp -r "${APP_PATH}" dist/Payload/
+          cd dist
+          zip -r "${APP_NAME}-v${VERSION_NAME}.ipa" Payload/
+          rm -rf Payload/
+        env:
+          APP_NAME: ${{ secrets.APP_NAME }}
+          PACKAGE_ID: ${{ secrets.PACKAGE_ID }}
+          VERSION_NAME: ${{ secrets.VERSION_NAME }}
+
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ secrets.APP_NAME }}-v${{ secrets.VERSION_NAME }}-APK
-          path: dist/*.apk
+          name: ${{ secrets.APP_NAME }}-v${{ secrets.VERSION_NAME }}-IPA
+          path: dist/*.ipa
           retention-days: 7
