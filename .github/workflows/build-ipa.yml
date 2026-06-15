@@ -8,14 +8,13 @@ jobs:
     runs-on: macos-latest
 
     steps:
-
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Install Cordova
         run: npm install -g cordova@13
@@ -33,17 +32,19 @@ jobs:
             targetUrl:   process.env.TARGET_URL,
             versionName: process.env.VERSION_NAME,
             versionCode: parseInt(process.env.VERSION_CODE),
-            icon:        './res/icon.png'
+            icon:        './res/icon.png',
+            orientation: process.env.ORIENTATION || 'default'
           };
           fs.writeFileSync('config.json', JSON.stringify(config, null, 2));
           console.log('config.json generated:', config);
           "
         env:
-          APP_NAME:     ${{ secrets.APP_NAME }}
-          PACKAGE_ID:   ${{ secrets.PACKAGE_ID }}
-          TARGET_URL:   ${{ secrets.TARGET_URL }}
+          APP_NAME: ${{ secrets.APP_NAME }}
+          PACKAGE_ID: ${{ secrets.PACKAGE_ID }}
+          TARGET_URL: ${{ secrets.TARGET_URL }}
           VERSION_NAME: ${{ secrets.VERSION_NAME }}
           VERSION_CODE: ${{ secrets.VERSION_CODE }}
+          ORIENTATION: ${{ secrets.ORIENTATION }}
 
       - name: Create Cordova project structure
         run: |
@@ -54,6 +55,12 @@ jobs:
           sed -i '' "s|version=\"1.0.0\"|version=\"${VERSION_NAME}\"|g" config.xml
           sed -i '' "s|<content src=\"index.html\" />|<content src=\"${TARGET_URL}\" />|g" config.xml
           sed -i '' "s|</widget>|    <access origin=\"*\" />\n    <allow-navigation href=\"*\" />\n    <allow-intent href=\"http://*/*\" />\n    <allow-intent href=\"https://*/*\" />\n</widget>|g" config.xml
+          # Lock screen orientation (global preference; applies to iOS).
+          # ORIENTATION defaults to "default" => no preference written => platform default.
+          ORIENT="${ORIENTATION:-default}"
+          if [ "$ORIENT" != "default" ]; then
+            sed -i '' "s|</widget>|    <preference name=\"Orientation\" value=\"${ORIENT}\" />\n</widget>|g" config.xml
+          fi
           if [ -f "../../res/icon.png" ]; then
             mkdir -p res
             cp ../../res/icon.png res/icon.png
@@ -81,10 +88,11 @@ jobs:
           </html>
           HTMLEOF
         env:
-          APP_NAME:     ${{ secrets.APP_NAME }}
-          PACKAGE_ID:   ${{ secrets.PACKAGE_ID }}
-          TARGET_URL:   ${{ secrets.TARGET_URL }}
+          APP_NAME: ${{ secrets.APP_NAME }}
+          PACKAGE_ID: ${{ secrets.PACKAGE_ID }}
+          TARGET_URL: ${{ secrets.TARGET_URL }}
           VERSION_NAME: ${{ secrets.VERSION_NAME }}
+          ORIENTATION: ${{ secrets.ORIENTATION }}
 
       - name: Build iOS (unsigned)
         run: |
@@ -102,8 +110,8 @@ jobs:
           zip -r "${APP_NAME}-v${VERSION_NAME}.ipa" Payload/
           rm -rf Payload/
         env:
-          APP_NAME:     ${{ secrets.APP_NAME }}
-          PACKAGE_ID:   ${{ secrets.PACKAGE_ID }}
+          APP_NAME: ${{ secrets.APP_NAME }}
+          PACKAGE_ID: ${{ secrets.PACKAGE_ID }}
           VERSION_NAME: ${{ secrets.VERSION_NAME }}
 
       - name: Upload IPA Artifact
