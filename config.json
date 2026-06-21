@@ -4,6 +4,6 @@
   "targetUrl": "https://your-website.com",
   "versionName": "1.0.0",
   "versionCode": 1,
-  "icon": "./res/icon.png",
-  "orientation": "default"
+  "icon": "./res/icon.png"
+  //"orientation": "default"
 }
