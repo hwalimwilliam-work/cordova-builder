@@ -14,7 +14,7 @@ if (!fs.existsSync(configPath)) {
 }
 
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-const { appName, packageId, targetUrl, versionName, versionCode, icon } = config;
+const { appName, packageId, targetUrl, versionName, versionCode, icon, orientation } = config;
 
 const requiredFields = ['appName', 'packageId', 'targetUrl', 'versionName', 'versionCode'];
 for (const field of requiredFields) {
@@ -29,6 +29,19 @@ try {
   new URL(targetUrl);
 } catch {
   console.error(`\n[ERROR] targetUrl "${targetUrl}" is not a valid URL. Aborting.\n`);
+  process.exit(1);
+}
+
+// Normalise & validate orientation (optional).
+// "default" => Cordova strips the preference and the platform default applies
+// (Android: all orientations, iOS: portrait). Use "landscape" / "portrait" to lock.
+const ALLOWED_ORIENTATIONS = ['default', 'landscape', 'portrait'];
+const orientationValue = String(orientation || 'default').toLowerCase();
+if (!ALLOWED_ORIENTATIONS.includes(orientationValue)) {
+  console.error(
+    `\n[ERROR] Invalid "orientation" value "${orientation}". ` +
+    `Allowed: ${ALLOWED_ORIENTATIONS.join(', ')}. Aborting.\n`
+  );
   process.exit(1);
 }
 
@@ -66,6 +79,7 @@ console.log(`  Package ID : ${packageId}`);
 console.log(`  Target URL : ${targetUrl}`);
 console.log(`  Version    : ${versionName} (code: ${versionCode})`);
 console.log(`  Icon       : ${icon || 'none (using Cordova default)'}`);
+console.log(`  Orientation: ${orientationValue}${orientationValue === 'default' ? ' (platform default)' : ' (locked)'}`);
 console.log('');
 
 // ─────────────────────────────────────────────
@@ -134,6 +148,9 @@ const androidBlock = `
     <allow-intent href="tel:*" />
     <allow-intent href="sms:*" />
     <allow-intent href="mailto:*" />
+
+    <!-- Screen Orientation (global preference => applies to Android & iOS) -->
+    ${orientationValue !== 'default' ? `<preference name="Orientation" value="${orientationValue}" />` : ''}
 
     <!-- Android Platform Config -->
     <platform name="android">
