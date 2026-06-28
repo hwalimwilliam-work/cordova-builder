@@ -8,13 +8,14 @@ jobs:
     runs-on: macos-latest
 
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: '18'
 
       - name: Install Cordova
         run: npm install -g cordova@13
@@ -39,12 +40,12 @@ jobs:
           console.log('config.json generated:', config);
           "
         env:
-          APP_NAME: ${{ secrets.APP_NAME }}
-          PACKAGE_ID: ${{ secrets.PACKAGE_ID }}
-          TARGET_URL: ${{ secrets.TARGET_URL }}
+          APP_NAME:     ${{ secrets.APP_NAME }}
+          PACKAGE_ID:   ${{ secrets.PACKAGE_ID }}
+          TARGET_URL:   ${{ secrets.TARGET_URL }}
           VERSION_NAME: ${{ secrets.VERSION_NAME }}
           VERSION_CODE: ${{ secrets.VERSION_CODE }}
-          ORIENTATION: ${{ secrets.ORIENTATION }}
+          ORIENTATION:  ${{ secrets.ORIENTATION }}
 
       - name: Create Cordova project structure
         run: |
@@ -88,11 +89,11 @@ jobs:
           </html>
           HTMLEOF
         env:
-          APP_NAME: ${{ secrets.APP_NAME }}
-          PACKAGE_ID: ${{ secrets.PACKAGE_ID }}
-          TARGET_URL: ${{ secrets.TARGET_URL }}
+          APP_NAME:     ${{ secrets.APP_NAME }}
+          PACKAGE_ID:   ${{ secrets.PACKAGE_ID }}
+          TARGET_URL:   ${{ secrets.TARGET_URL }}
           VERSION_NAME: ${{ secrets.VERSION_NAME }}
-          ORIENTATION: ${{ secrets.ORIENTATION }}
+          ORIENTATION:  ${{ secrets.ORIENTATION }}
 
       - name: Build iOS (unsigned)
         run: |
@@ -110,8 +111,8 @@ jobs:
           zip -r "${APP_NAME}-v${VERSION_NAME}.ipa" Payload/
           rm -rf Payload/
         env:
-          APP_NAME: ${{ secrets.APP_NAME }}
-          PACKAGE_ID: ${{ secrets.PACKAGE_ID }}
+          APP_NAME:     ${{ secrets.APP_NAME }}
+          PACKAGE_ID:   ${{ secrets.PACKAGE_ID }}
           VERSION_NAME: ${{ secrets.VERSION_NAME }}
 
       - name: Upload IPA Artifact
