@@ -40,14 +40,15 @@ jobs:
         run: |
           node -e "
           const fs = require('fs');
+          const clean = (v) => (v || '').trim();
           const config = {
-            appName:     process.env.APP_NAME,
-            packageId:   process.env.PACKAGE_ID,
-            targetUrl:   process.env.TARGET_URL,
-            versionName: process.env.VERSION_NAME,
-            versionCode: parseInt(process.env.VERSION_CODE),
-            icon:        './res/icon.png',
-            orientation: process.env.ORIENTATION || 'default'
+            appName:     clean(process.env.APP_NAME),
+            packageId:   clean(process.env.PACKAGE_ID),
+            targetUrl:   clean(process.env.TARGET_URL),
+            versionName: clean(process.env.VERSION_NAME),
+            versionCode: parseInt(clean(process.env.VERSION_CODE), 10),
+            orientation: clean(process.env.ORIENTATION) || 'default',
+            icon:        './res/icon.png'
           };
           fs.writeFileSync('config.json', JSON.stringify(config, null, 2));
           console.log('config.json generated successfully');
