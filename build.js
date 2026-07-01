@@ -14,7 +14,7 @@ if (!fs.existsSync(configPath)) {
 }
 
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-const { appName, packageId, targetUrl, versionName, versionCode, icon, orientation } = config;
+const { appName, packageId, targetUrl, versionName, versionCode, icon } = config;
 
 const requiredFields = ['appName', 'packageId', 'targetUrl', 'versionName', 'versionCode'];
 for (const field of requiredFields) {
@@ -29,19 +29,6 @@ try {
   new URL(targetUrl);
 } catch {
   console.error(`\n[ERROR] targetUrl "${targetUrl}" is not a valid URL. Aborting.\n`);
-  process.exit(1);
-}
-
-// Normalise & validate orientation (optional).
-// "default" => Cordova strips the preference and the platform default applies
-// (Android: all orientations, iOS: portrait). Use "landscape" / "portrait" to lock.
-const ALLOWED_ORIENTATIONS = ['default', 'landscape', 'portrait'];
-const orientationValue = String(orientation || 'default').toLowerCase();
-if (!ALLOWED_ORIENTATIONS.includes(orientationValue)) {
-  console.error(
-    `\n[ERROR] Invalid "orientation" value "${orientation}". ` +
-    `Allowed: ${ALLOWED_ORIENTATIONS.join(', ')}. Aborting.\n`
-  );
   process.exit(1);
 }
 
@@ -79,7 +66,6 @@ console.log(`  Package ID : ${packageId}`);
 console.log(`  Target URL : ${targetUrl}`);
 console.log(`  Version    : ${versionName} (code: ${versionCode})`);
 console.log(`  Icon       : ${icon || 'none (using Cordova default)'}`);
-console.log(`  Orientation: ${orientationValue}${orientationValue === 'default' ? ' (platform default)' : ' (locked)'}`);
 console.log('');
 
 // ─────────────────────────────────────────────
@@ -137,7 +123,12 @@ configXml = configXml.replace(
 configXml = configXml.replace(/<allow-intent[^\/]*\/>\s*/g, '');
 
 // Build Android platform block
-const iconRelPath = 'res/icon.png'; // we copy icon here in step 5
+const iconRelPath       = 'res/icon.png';        // launcher icon (copied in step 5)
+const splashIconRelPath = 'res/splash_icon.png'; // Android 12+ splash icon (copied in step 5)
+
+// Splash / fullscreen theming (dark to match a typical dark web UI; adjust if needed)
+const splashBackground   = '#000000';   // Android 12+ system splash background
+const backgroundColorArgb = '0xFF000000'; // WebView/app background (ARGB) — prevents white flashes
 
 const androidBlock = `
     <!-- Network Access Rules -->
@@ -149,9 +140,6 @@ const androidBlock = `
     <allow-intent href="sms:*" />
     <allow-intent href="mailto:*" />
 
-    <!-- Screen Orientation (global preference => applies to Android & iOS) -->
-    ${orientationValue !== 'default' ? `<preference name="Orientation" value="${orientationValue}" />` : ''}
-
     <!-- Android Platform Config -->
     <platform name="android">
         <preference name="android-minSdkVersion"    value="24" />
@@ -162,6 +150,22 @@ const androidBlock = `
         <preference name="MediaPlaybackRequiresUserAction" value="false" />
         <preference name="DisallowOverscroll"        value="true" />
         <preference name="LoadUrlTimeoutValue"       value="30000" />
+
+        <!-- Immersive fullscreen: hides BOTH status bar and navigation bar.
+             Applied natively by CordovaActivity on every window-focus change,
+             so it persists after navigating to the external Target URL. -->
+        <preference name="Fullscreen"                value="true" />
+
+        <!-- App/WebView background: eliminates white flashes between splash,
+             local index.html, and the remote page load. -->
+        <preference name="BackgroundColor"           value="${backgroundColorArgb}" />
+
+        <!-- Android 12+ system splash screen (replaces the default Cordova icon). -->
+        <preference name="AndroidWindowSplashScreenBackground"          value="${splashBackground}" />
+        <preference name="AndroidWindowSplashScreenIconBackgroundColor" value="${splashBackground}" />
+        <preference name="AndroidWindowSplashScreenAnimatedIcon"        value="${splashIconRelPath}" />
+        <preference name="AndroidWindowSplashScreenAnimationDuration"   value="200" />
+
         ${icon ? `<icon src="${iconRelPath}" />` : ''}
     </platform>
 `;
@@ -190,6 +194,25 @@ if (icon) {
   }
 } else {
   console.log('  No icon specified. Using Cordova default.');
+}
+
+// Splash icon: prefer a purpose-built res/splash_icon.png (safe-zone padded so the
+// Android 12+ circular mask does not clip it). If absent, fall back to the launcher
+// icon so the build still replaces Cordova's default gray icon.
+const splashDestDir = path.join(projectDir, 'res');
+if (!fs.existsSync(splashDestDir)) fs.mkdirSync(splashDestDir, { recursive: true });
+
+const dedicatedSplash = path.resolve(__dirname, 'res/splash_icon.png');
+const fallbackSplash  = icon ? path.resolve(__dirname, icon) : null;
+const splashSrc = fs.existsSync(dedicatedSplash)
+  ? dedicatedSplash
+  : (fallbackSplash && fs.existsSync(fallbackSplash) ? fallbackSplash : null);
+
+if (splashSrc) {
+  fs.copyFileSync(splashSrc, path.join(splashDestDir, 'splash_icon.png'));
+  console.log(`  Splash icon copied to project (source: ${path.basename(splashSrc)}).`);
+} else {
+  console.warn('  [WARNING] No splash icon source found. Cordova default splash icon will be used.');
 }
 
 // ─────────────────────────────────────────────
