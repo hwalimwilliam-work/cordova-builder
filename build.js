@@ -16,6 +16,27 @@ if (!fs.existsSync(configPath)) {
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 const { appName, packageId, targetUrl, versionName, versionCode, icon } = config;
 
+// Orientation (optional). Cordova passes this value straight to the manifest's
+// android:screenOrientation, except "default" which leaves it unlocked (sensor).
+// Android's screenOrientation keywords are CASE-SENSITIVE, so we normalize the
+// secret value to canonical casing and guard against a bad value that would
+// otherwise fail the Android (AAPT) build.
+const ORIENTATION_CANONICAL = [
+  'default', 'unspecified', 'behind', 'landscape', 'portrait',
+  'reverseLandscape', 'reversePortrait', 'sensorLandscape', 'sensorPortrait',
+  'userLandscape', 'userPortrait', 'sensor', 'fullSensor', 'nosensor',
+  'user', 'fullUser', 'locked'
+];
+const ORIENTATION_MAP = new Map(ORIENTATION_CANONICAL.map(v => [v.toLowerCase(), v]));
+
+const orientationInput = (config.orientation || 'default').trim();
+let orientation = ORIENTATION_MAP.get(orientationInput.toLowerCase());
+if (!orientation) {
+  console.warn(`\n[WARNING] Unrecognized orientation "${orientationInput}". Falling back to "default".`);
+  console.warn(`          Valid values: default, portrait, landscape, sensorPortrait, sensorLandscape, userPortrait, userLandscape, etc.\n`);
+  orientation = 'default';
+}
+
 const requiredFields = ['appName', 'packageId', 'targetUrl', 'versionName', 'versionCode'];
 for (const field of requiredFields) {
   if (!config[field] && config[field] !== 0) {
@@ -65,6 +86,7 @@ console.log(`\n  App Name   : ${appName}`);
 console.log(`  Package ID : ${packageId}`);
 console.log(`  Target URL : ${targetUrl}`);
 console.log(`  Version    : ${versionName} (code: ${versionCode})`);
+console.log(`  Orientation: ${orientation}`);
 console.log(`  Icon       : ${icon || 'none (using Cordova default)'}`);
 console.log('');
 
@@ -150,6 +172,9 @@ const androidBlock = `
         <preference name="MediaPlaybackRequiresUserAction" value="false" />
         <preference name="DisallowOverscroll"        value="true" />
         <preference name="LoadUrlTimeoutValue"       value="30000" />
+
+        <!-- Screen orientation (from ORIENTATION secret; "default" = unlocked/sensor). -->
+        <preference name="Orientation"               value="${orientation}" />
 
         <!-- Immersive fullscreen: hides BOTH status bar and navigation bar.
              Applied natively by CordovaActivity on every window-focus change,
